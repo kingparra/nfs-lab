@@ -1,0 +1,8 @@
+[all]
+10.0.0.10
+10.0.0.11
+
+[all:vars]
+ansible_user=vagrant
+ansible_ssh_private_key_file=~/.vagrant.d/insecure_private_key
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'

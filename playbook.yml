@@ -1,0 +1,57 @@
+---
+- hosts: nfs-server
+  become: true
+  tasks:
+
+    - name: Install NFS server
+      dnf: name=nfs-utils state=present
+
+    - name: Share directory exists
+      file: path=/nfs state=directory mode='0777' owner='vagrant'
+
+    - name: Share is in exports
+      shell: "echo '/nfs *(rw)' > /etc/exports"
+
+    - name: Enable and start systemd service for NFS
+      systemd: service=nfs-server enabled=true state=started
+
+    - name: Enable the firwalld services needed for NFS
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: true
+      loop: [nfs, rpc-bind, mountd]
+
+    - name: Apply permanent firewalld config to running config
+      systemd: unit=firewalld.service state=restarted
+
+- hosts: nfs-client
+  become: true
+  tasks:
+
+    - name: Install NFS client tools
+      dnf: name=nfs-utils state=present
+
+    - name: Install network troubleshooting tools
+      dnf:
+        name: "{{ item }}"
+        state: present
+      loop: ["netcat", "nmap"]
+
+    - name: Enable nfs-client.target
+      systemd: unit=nfs-client.target enabled=true state=started
+
+    - name: Install autofs
+      dnf: name=autofs state=present
+
+    - name: Configure autofs master map
+      # mount-point [map-type[,format]:]map [options]
+      # cfgfile_naming /etc/auto.master.d/$key.autofs
+      shell: echo '/- /etc/auto.nfs' > /etc/auto.master.d/nfs.autofs
+
+    - name: Configure direct autofs mount
+      # key [-options] location
+      shell: echo '/nfs 10.0.0.10:/nfs' > /etc/auto.nfs
+
+    - name: Enalble autofs
+      systemd: unit=autofs.service state=restarted enabled=true
